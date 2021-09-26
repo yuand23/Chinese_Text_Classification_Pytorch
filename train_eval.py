@@ -7,6 +7,7 @@ from sklearn import metrics
 import time
 from utils import get_time_dif
 from tensorboardX import SummaryWriter
+from tqdm import tqdm
 
 
 # 权重初始化，默认xavier
@@ -26,7 +27,7 @@ def init_network(model, method='xavier', exclude='embedding', seed=123):
                 pass
 
 
-def train(config, model, train_iter, dev_iter, test_iter):
+def train(config, model, train_iter, dev_iter):
     start_time = time.time()
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
@@ -77,7 +78,20 @@ def train(config, model, train_iter, dev_iter, test_iter):
         if flag:
             break
     writer.close()
-    test(config, model, test_iter)
+
+    model.eval()
+    start_time = time.time()
+    dev_acc, dev_loss, dev_report, dev_confusion = evaluate(config, model, dev_iter, mode='val')
+    msg = 'dev Loss: {0:>5.2},  dev Acc: {1:>6.2%}'
+    print(msg.format(dev_loss, dev_acc))
+    print("Precision, Recall and F1-Score...")
+    print(dev_report)
+    print("Confusion Matrix...")
+    print(dev_confusion)
+    time_dif = get_time_dif(start_time)
+    print("Time usage:", time_dif)
+
+    # test(config, model, test_iter)
 
 
 def test(config, model, test_iter):
@@ -85,7 +99,7 @@ def test(config, model, test_iter):
     model.load_state_dict(torch.load(config.save_path))
     model.eval()
     start_time = time.time()
-    test_acc, test_loss, test_report, test_confusion = evaluate(config, model, test_iter, test=True)
+    test_acc, test_loss, test_report, test_confusion, predicts = evaluate(config, model, test_iter, mode='test')
     msg = 'Test Loss: {0:>5.2},  Test Acc: {1:>6.2%}'
     print(msg.format(test_loss, test_acc))
     print("Precision, Recall and F1-Score...")
@@ -94,9 +108,18 @@ def test(config, model, test_iter):
     print(test_confusion)
     time_dif = get_time_dif(start_time)
     print("Time usage:", time_dif)
+    cnt = 0
+    with open(config.test_save_path, 'w', encoding='UTF-8') as fw:
+        with open(config.test_path, 'r', encoding='UTF-8') as fr:
+             for line in tqdm(fr):
+                lin = line.strip()
+                if not lin:
+                    continue
+                content, label = lin.split('\t')
+                fw.write('{}\t{}\t{}\n'.format(content,label,predicts[cnt]))
+                cnt += 1
 
-
-def evaluate(config, model, data_iter, test=False):
+def evaluate(config, model, data_iter, mode=''):
     model.eval()
     loss_total = 0
     predict_all = np.array([], dtype=int)
@@ -112,8 +135,13 @@ def evaluate(config, model, data_iter, test=False):
             predict_all = np.append(predict_all, predic)
 
     acc = metrics.accuracy_score(labels_all, predict_all)
-    if test:
+    if mode == 'val':
         report = metrics.classification_report(labels_all, predict_all, target_names=config.class_list, digits=4)
         confusion = metrics.confusion_matrix(labels_all, predict_all)
         return acc, loss_total / len(data_iter), report, confusion
-    return acc, loss_total / len(data_iter)
+    elif mode == 'test':
+        report = metrics.classification_report(labels_all, predict_all, target_names=config.class_list, digits=4)
+        confusion = metrics.confusion_matrix(labels_all, predict_all)
+        return acc, loss_total / len(data_iter), report, confusion, predict_all
+    else:
+        return acc, loss_total / len(data_iter)

@@ -28,7 +28,7 @@ def build_vocab(file_path, tokenizer, max_size, min_freq):
     return vocab_dic
 
 
-def build_dataset(config, ues_word):
+def build_dataset(config, ues_word, iftest=False):
     if ues_word:
         tokenizer = lambda x: x.split(' ')  # 以空格隔开，word-level
     else:
@@ -81,10 +81,13 @@ def build_dataset(config, ues_word):
                 # -----------------
                 contents.append((words_line, int(label), seq_len, bigram, trigram))
         return contents  # [([...], 0), ([...], 1), ...]
-    train = load_dataset(config.train_path, config.pad_size)
-    dev = load_dataset(config.dev_path, config.pad_size)
-    test = load_dataset(config.test_path, config.pad_size)
-    return vocab, train, dev, test
+    if iftest:
+        test = load_dataset(config.test_path, config.pad_size)
+        return vocab, test
+    else:
+        train = load_dataset(config.train_path, config.pad_size)
+        dev = load_dataset(config.dev_path, config.pad_size)
+        return vocab, train, dev
 
 
 class DatasetIterater(object):

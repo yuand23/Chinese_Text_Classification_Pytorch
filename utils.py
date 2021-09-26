@@ -7,7 +7,6 @@ from tqdm import tqdm
 import time
 from datetime import timedelta
 
-
 MAX_VOCAB_SIZE = 10000  # 词表长度限制
 UNK, PAD = '<UNK>', '<PAD>'  # 未知字，padding符号
 
@@ -28,7 +27,7 @@ def build_vocab(file_path, tokenizer, max_size, min_freq):
     return vocab_dic
 
 
-def build_dataset(config, ues_word):
+def build_dataset(config, ues_word, iftest=False):
     if ues_word:
         tokenizer = lambda x: x.split(' ')  # 以空格隔开，word-level
     else:
@@ -62,10 +61,13 @@ def build_dataset(config, ues_word):
                     words_line.append(vocab.get(word, vocab.get(UNK)))
                 contents.append((words_line, int(label), seq_len))
         return contents  # [([...], 0), ([...], 1), ...]
-    train = load_dataset(config.train_path, config.pad_size)
-    dev = load_dataset(config.dev_path, config.pad_size)
-    test = load_dataset(config.test_path, config.pad_size)
-    return vocab, train, dev, test
+    if iftest:
+        test = load_dataset(config.test_path, config.pad_size)
+        return vocab, test
+    else:
+        train = load_dataset(config.train_path, config.pad_size)
+        dev = load_dataset(config.dev_path, config.pad_size)
+        return vocab, train, dev
 
 
 class DatasetIterater(object):
@@ -124,15 +126,59 @@ def get_time_dif(start_time):
     time_dif = end_time - start_time
     return timedelta(seconds=int(round(time_dif)))
 
+# csv数据文件转txt文件，并生成class.txt，部分模型（除LM_cls之外的模型）的输入数据为“文本\tab标签编号”形式
+def csv2txt():
+    import pandas as pd
+    train_data = pd.read_csv("./data/train.csv",header=0).dropna() # 默认with headers，数据格式为text,label
+    val_data = pd.read_csv("./data/val.csv",header=0).dropna()
+    test_data = pd.read_csv("./data/test.csv",header=0).dropna()
+    labels = set(train_data.iloc[:,1])
+    assert labels == set(val_data.iloc[:,1])
+    with open("./data/class.txt",'w') as f:
+        for i in labels:
+            f.write("{}\n".format(i))
+    labels_dict = {k:v for v,k in enumerate(labels)}
+    train_data.replace({list(train_data)[1]:labels_dict}, inplace=True)
+    val_data.replace({list(val_data)[1]:labels_dict}, inplace=True)
+    test_data.replace({list(test_data)[1]:labels_dict}, inplace=True)
+    
+    train_data.to_csv('./data/train.txt', index=False, sep='\t', header=False)
+    val_data.to_csv('./data/dev.txt', index=False, sep='\t', header=False)
+    test_data.to_csv('./data/test.txt', index=False, sep='\t', header=False)
+
+# 将txt数据文件（text \t tag编号）转换成带header的csv文件（text, tag文字）
+# 用于数据预处理
+def txt2csv():
+    import pandas as pd
+    data_path = "data/THUCNews/data/"
+    train_data = pd.read_csv(data_path + "train.txt",header=None,sep='\t').dropna() # 默认with headers，数据格式为text,label
+    val_data = pd.read_csv(data_path + "dev.txt",header=None,sep='\t').dropna()
+    test_data = pd.read_csv(data_path + "test.txt",header=None,sep='\t').dropna()
+    labels = set(train_data.iloc[:,1])
+    assert labels == set(val_data.iloc[:,1])
+    labels = list(line.strip() for line in open(data_path + "class.txt",'r'))
+    labels_dict = {k:v for k,v in enumerate(labels)}
+
+    train_data.replace({list(train_data)[1]:labels_dict}, inplace=True)
+    val_data.replace({list(val_data)[1]:labels_dict}, inplace=True)
+    test_data.replace({list(test_data)[1]:labels_dict}, inplace=True)
+    
+    train_data.columns = ['text','tag']
+    val_data.columns = ['text','tag']
+    test_data.columns = ['text','tag']
+    train_data.to_csv(data_path + "train.csv", index=False)
+    val_data.to_csv(data_path + "dev.csv", index=False)
+    test_data.to_csv(data_path + "test.csv", index=False)
 
 if __name__ == "__main__":
     '''提取预训练词向量'''
     # 下面的目录、文件名按需更改。
-    train_dir = "./THUCNews/data/train.txt"
-    vocab_dir = "./THUCNews/data/vocab.pkl"
-    pretrain_dir = "./THUCNews/data/sgns.sogou.char"
+    
+    train_dir = "./data/THUCNews/data/train.txt"
+    vocab_dir = "./data/THUCNews/data/vocab.pkl"
+    pretrain_dir = "./data/sgns.sogou.char"
     emb_dim = 300
-    filename_trimmed_dir = "./THUCNews/data/embedding_SougouNews"
+    filename_trimmed_dir = "./data/embedding_SougouNews"
     if os.path.exists(vocab_dir):
         word_to_id = pkl.load(open(vocab_dir, 'rb'))
     else:
@@ -153,3 +199,5 @@ if __name__ == "__main__":
             embeddings[idx] = np.asarray(emb, dtype='float32')
     f.close()
     np.savez_compressed(filename_trimmed_dir, embeddings=embeddings)
+    
+    # txt2csv()
