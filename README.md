@@ -55,7 +55,6 @@ python run.py --model LM --action_typ test
 
 生成的测试文件保存于test_result.txt  
 
-## 使用说明
 数据格式train.txt, dev.txt, test.txt  
 text \t tag
 
