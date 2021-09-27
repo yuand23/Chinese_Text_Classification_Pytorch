@@ -26,7 +26,7 @@ DEVICE = torch.device("cuda:0") if torch.cuda.is_available() else 'cpu'
 MAX_LENGTH = 50
 EPOCHS = 20
 LR = 5e-4
-BATCH_SIZE = 1
+BATCH_SIZE = 32
 
 def get_labels_dict(labels_set={}): # 如果为空则读取，否则保存
     tag2idx = {}
@@ -118,8 +118,6 @@ def train():
         val_num_batch = 0  
         model_cls.train()
         for batch in train_dataloader:
-            print(batch[3])
-            sys.exit()
             batch = {"input_ids":batch[0].to(DEVICE),
                      "attention_mask":batch[1].to(DEVICE),
                      "token_type_ids":batch[2].to(DEVICE),
@@ -204,7 +202,7 @@ def test():
             logits = outputs.logits
             predictions = torch.argmax(logits, dim=-1)   
             preds.append(predictions.item())
-            labels.append(label)
+            labels.append(tag2idx[label])
             f.write("{}\t{}\t{}\n".format(text, label, idx2tag[predictions.item()]))
             progress_bar.update(1)
         print(confusion_matrix(labels, preds))
