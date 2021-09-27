@@ -207,6 +207,8 @@ def test():
             labels.append(label)
             f.write("{}\t{}\t{}\n".format(text, label, idx2tag[predictions.item()]))
             progress_bar.update(1)
+        print(confusion_matrix(labels, preds))
+        print(classification_report(labels, preds, labels=list(tag2idx.values()), target_names=list(tag2idx.keys())))
 def test_single():
     LT = torch.LongTensor
     model_file = os.path.join(MODEL_SAVE, MODEL_DIR_NAME)
