@@ -59,9 +59,9 @@ python run.py --model LM --action_typ test
 python run.py --model LM --action_typ test_single
 ```
 
-生成的测试文件保存于test_result.txt without headers  
+生成的测试文件保存于test_result.txt  
 
-数据格式1：train.txt, dev.txt, test.txt  
+数据格式1：train.txt, dev.txt, test.txt without headers    
 text \t tag编号  
 以及class.txt，为类别名称  
 
