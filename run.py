@@ -6,8 +6,8 @@ from importlib import import_module
 import argparse
 
 parser = argparse.ArgumentParser(description='Chinese Text Classification')
-parser.add_argument('--model', type=str, required=True, help='choose a model: TextCNN, TextRNN, FastText, TextRCNN, TextRNN_Att, DPCNN, Transformer, LM')
-parser.add_argument('--action_typ', type=str, required=True, help='Provide an action type: train, test')
+parser.add_argument('--model', type=str, required=True, help='choose a model: TextCNN, TextRNN, FastText, TextRCNN, TextRNN_Att, DPCNN, Transformer, LM, preprosses')
+parser.add_argument('--action_typ', type=str, required=True, help='Provide an action type: train, test, preprosses')
 parser.add_argument('--embedding', default='pre_trained', type=str, help='random or pre_trained')
 parser.add_argument('--word', default=False, type=bool, help='True for word, False for char')
 args = parser.parse_args()
@@ -70,8 +70,14 @@ if __name__ == '__main__':
         elif action_typ == 'test':
             from models.LM_fc import test
             test()
+        elif action_typ == 'test_single':
+            from models.LM_fc import test_single
+            test_single()
         else:
             raise Exception("Action type not in the list")
+    elif model_name == 'preprosses':
+        from utils import csv2txt
+        csv2txt()
     else:
         raise Exception("Model name not in the list")
 

@@ -53,10 +53,21 @@ python run.py --model Transformer --action_typ test
 python run.py --model LM --action_typ test
 ```
 
+```
+# 交互式测试：
+# Pretrained LM
+python run.py --model LM --action_typ test_single
+```
+
 生成的测试文件保存于test_result.txt  
 
-数据格式train.txt, dev.txt, test.txt  
-text \t tag
+数据格式1：train.txt, dev.txt, test.txt  
+text \t tag编号  
+以及class.txt，为类别名称  
+
+数据格式2：train.csv, dev.csv, test.csv with headers  
+text,tag名称  
+使用python run.py --model preprosses --action_typ preprosses转换成格式1  
 
 ## referece
 https://github.com/649453932/Chinese-Text-Classification-Pytorch  

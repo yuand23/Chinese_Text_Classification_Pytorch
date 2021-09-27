@@ -12,6 +12,7 @@ import argparse
 from sklearn.model_selection import train_test_split
 from torch.utils.data import TensorDataset
 from pathlib import Path
+from utils import txt2csv
 
 TOKENIZER_FILE = '../bert_models/bert_base_chinese'
 PRETRAINED = '../bert_models/albert_chinese_tiny'  #Use small version of Albert
@@ -25,7 +26,7 @@ DEVICE = torch.device("cuda:0") if torch.cuda.is_available() else 'cpu'
 MAX_LENGTH = 50
 EPOCHS = 20
 LR = 5e-4
-BATCH_SIZE = 32
+BATCH_SIZE = 1
 
 def get_labels_dict(labels_set={}): # 如果为空则读取，否则保存
     tag2idx = {}
@@ -50,8 +51,10 @@ def train():
 
     print("config.hidden_size, config.embedding_size, config.max_length: ")
     print(config.hidden_size, config.embedding_size, config.max_length)
-    
+
     train_file = os.path.join(DATA_DIR,"train.csv") # 默认名称
+    if not os.path.exists(train_file):
+        txt2csv()
     val_file = os.path.join(DATA_DIR,"dev.csv")
     train_data = pd.read_csv(train_file,header=0).dropna() # 默认with headers，数据格式为text,label
     val_data = pd.read_csv(val_file,header=0).dropna()
@@ -115,6 +118,8 @@ def train():
         val_num_batch = 0  
         model_cls.train()
         for batch in train_dataloader:
+            print(batch[3])
+            sys.exit()
             batch = {"input_ids":batch[0].to(DEVICE),
                      "attention_mask":batch[1].to(DEVICE),
                      "token_type_ids":batch[2].to(DEVICE),
@@ -162,8 +167,8 @@ def train():
         if epoch == 0 or val_loss_sum/len(val_dataset) < min(val_loss_sum_lst):
             output_model_file = os.path.join(MODEL_SAVE, MODEL_DIR_NAME)
             # output_vocab_file = os.path.join(MODEL_SAVE, 'vocab.txt')
-            # torch.save(model_cls, output_model_file)
-            torch.save(model_cls.state_dict(), output_model_file)
+            torch.save(model_cls, output_model_file)
+            # torch.save(model_cls.state_dict(), output_model_file)
             print("model saved")
             print("train data: ")
             print(confusion_matrix(train_label, train_pred))
@@ -174,6 +179,7 @@ def train():
             print("val data: ")
             print(classification_report(val_label, val_pred, labels=list(tag2idx.values()), target_names=list(tag2idx.keys())))
 def test():
+    LT = torch.LongTensor
     model_file = os.path.join(MODEL_SAVE, MODEL_DIR_NAME)
     model = torch.load(model_file).to('cpu')
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_FILE)
@@ -181,19 +187,28 @@ def test():
     idx2tag = {v:k for k,v in tag2idx.items()}
     model.eval()
     test_file = os.path.join(DATA_DIR, "test.csv")
+    if not os.path.exists(test_file):
+        txt2csv()
     df_test = pd.read_csv(test_file, header=0)
+    preds,labels = [],[]
+    progress_bar = tqdm(range(len(df_test)))
     with open(os.path.join(DATA_DIR, SAVE_TEST_RESULT), "w") as f:
+        print("Writing to test_result.csv file")
         for text, label in df_test.values:
             tokenized_text = tokenizer(text, max_length=MAX_LENGTH, padding='max_length', truncation=True)
-            batch = {"input_ids":tokenized_text["input_ids"].to(DEVICE),
-                     "attention_mask":tokenized_text["attention_mask"].to(DEVICE),
-                     "token_type_ids":tokenized_text["token_type_ids"].to(DEVICE),
-                     "labels":tag2idx[label].to(DEVICE)}
+            batch = {"input_ids":torch.unsqueeze(LT(tokenized_text["input_ids"]), 0),
+                     "attention_mask":torch.unsqueeze(LT(tokenized_text["attention_mask"]), 0),
+                     "token_type_ids":torch.unsqueeze(LT(tokenized_text["token_type_ids"]), 0),
+                     "labels":LT([tag2idx[label]])}
             outputs = model(**batch)  
             logits = outputs.logits
-            predictions = torch.argmax(logits, dim=-1)        
+            predictions = torch.argmax(logits, dim=-1)   
+            preds.append(predictions.item())
+            labels.append(label)
             f.write("{}\t{}\t{}\n".format(text, label, idx2tag[predictions.item()]))
+            progress_bar.update(1)
 def test_single():
+    LT = torch.LongTensor
     model_file = os.path.join(MODEL_SAVE, MODEL_DIR_NAME)
     model = torch.load(model_file).to('cpu')
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_FILE)
@@ -203,11 +218,11 @@ def test_single():
     while True:
         print("Enter your sentence..")
         text = input()
-        tokenized_text = tokenizer.encode(text, max_length=MAX_LENGTH, padding='max_length', truncation=True)
-        batch = {"input_ids":tokenized_text["input_ids"].to(DEVICE),
-                 "attention_mask":tokenized_text["attention_mask"].to(DEVICE),
-                 "token_type_ids":tokenized_text["token_type_ids"].to(DEVICE),
-                 "labels":tag2idx[label].to(DEVICE)}
+        tokenized_text = tokenizer(text, max_length=MAX_LENGTH, padding='max_length', truncation=True)
+        batch = {"input_ids":torch.unsqueeze(LT(tokenized_text["input_ids"]), 0),
+                "attention_mask":torch.unsqueeze(LT(tokenized_text["attention_mask"]), 0),
+                "token_type_ids":torch.unsqueeze(LT(tokenized_text["token_type_ids"]), 0),
+                "labels":LT([0])} # labels随机给0
         outputs = model(**batch)  
         logits = outputs.logits
         predictions = torch.argmax(logits, dim=-1)    
