@@ -69,7 +69,7 @@ text \t tag编号
 text,tag名称  
 使用python run.py --model preprosses --action_typ preprosses转换成格式1  
 
-## referece
+## Reference
 https://github.com/649453932/Chinese-Text-Classification-Pytorch  
 增加了预训练语言模型+fc分类模型；将测试和训练分开，并输出测试结果。  
 
